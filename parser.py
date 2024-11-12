@@ -18,6 +18,7 @@ class Event:
     'LAST-MODIFIED': '20241024T090202Z',
     'SEQUENCE': '2141479482'
     }"""
+
     def __init__(self, **kwargs):
         self._DTSTAMP = kwargs.get("DTSTAMP")
         self._DTSTART = kwargs.get("DTSTART")
@@ -29,56 +30,68 @@ class Event:
         self._CREATED = kwargs.get("CREATED")
         self._LAST_MODIFIED = kwargs.get("LAST-MODIFIED")
         self._SEQUENCE = kwargs.get("SEQUENCE")
+        self._PROF = "DS" if "DS" in self._SUMMARY else self._DESCRIPTION.split(
+            "\\n")[-4]
         # Convert date strings to datetime objects
 
-        self._DTSTAMP = datetime.datetime.strptime(self._DTSTAMP, "%Y%m%dT%H%M%SZ")
-        self._DTSTART = datetime.datetime.strptime(self._DTSTART, "%Y%m%dT%H%M%SZ")
+        self._DTSTAMP = datetime.datetime.strptime(self._DTSTAMP,
+                                                   "%Y%m%dT%H%M%SZ")
+        self._DTSTART = datetime.datetime.strptime(self._DTSTART,
+                                                   "%Y%m%dT%H%M%SZ")
         self._DTEND = datetime.datetime.strptime(self._DTEND, "%Y%m%dT%H%M%SZ")
-        self._CREATED = datetime.datetime.strptime(self._CREATED, "%Y%m%dT%H%M%SZ")
-        self._LAST_MODIFIED = datetime.datetime.strptime(self._LAST_MODIFIED, "%Y%m%dT%H%M%SZ")
-
+        self._CREATED = datetime.datetime.strptime(self._CREATED,
+                                                   "%Y%m%dT%H%M%SZ")
+        self._LAST_MODIFIED = datetime.datetime.strptime(
+            self._LAST_MODIFIED, "%Y%m%dT%H%M%SZ")
 
         self._DTSTART += datetime.timedelta(hours=1)
         self._DTEND += datetime.timedelta(hours=1)
-        
+
     @property
     def start(self):
         return self._DTSTART
-    
+
     @property
     def end(self):
         return self._DTEND
-    
+
     @property
     def summary(self):
         return self._SUMMARY
-    
+
     @property
     def location(self):
         return self._LOCATION
-    
+
     @property
     def description(self):
         return self._DESCRIPTION
-    
+
     @property
     def uid(self):
         return self._UID
-    
+
     @property
     def created(self):
         return self._CREATED
-    
+
     @property
     def last_modified(self):
         return self._LAST_MODIFIED
-    
+
     @property
     def sequence(self):
         return self._SEQUENCE
 
+    @property
+    def prof(self):
+        return self._PROF
+
     def __str__(self):
-        return f"{self.summary} ({self.start} - {self.end})"
+        return f"""{self.summary} ({self.start} - {self.end})
+{self.prof}
+{self.location}
+"""
 
     def __repr__(self):
         return self.__str__()
@@ -88,21 +101,22 @@ class Event:
 
     def __gt__(self, other):
         return self.start > other.start
-    
+
     def __eq__(self, other):
         return self.start == other.start
-    
+
     def __ne__(self, other):
         return self.start != other.start
-    
+
     def __le__(self, other):
         return self.start <= other.start
-    
+
     def __ge__(self, other):
         return self.start >= other.start
-    
+
     def __hash__(self):
         return hash(self.uid)
+
 
 def parse_ics(ics_file_path):
     events = []
@@ -126,11 +140,11 @@ def parse_ics(ics_file_path):
 
     return events
 
+
 # Exemple d'utilisation
 
 
-
-def Calendar(group, date_start, date_end):
+def Calendar(group: str, date_start: str, date_end: str):
     """Get the calendar of a group from the start date to the end date
     
     In:
@@ -152,7 +166,7 @@ def Calendar(group, date_start, date_end):
         groups = json.load(file)
 
     url = f'https://adelb.univ-lyon1.fr/jsp/custom/modules/plannings/anonymous_cal.jsp?resources={groups[group]}&projectId=0&calType=ical&firstDate={date_start}&lastDate={date_end}'
-    
+
     with open("agent.txt", "r") as file:
         agent = file.read()
 
@@ -162,10 +176,28 @@ def Calendar(group, date_start, date_end):
     with open(ics_file, 'wb') as file:
         file.write(response.content)
 
+    parsed_events = parse_ics(ics_file)
 
-    parsed_events = parse_ics(ics_file) 
+    parsed_events.sort()
+
     return parsed_events
 
-calendar = sorted(Calendar("G3S1A", "2024-11-4", "2024-11-8"))
-for event in calendar:
-    print(str(event))
+
+def daily(group: str, date: str):
+    cal = Calendar(group, date, date)
+    message = _join_cal(cal=cal)
+    return message
+
+
+def today(group: str):
+    date = datetime.datetime.now().strftime("YYYY-MM-DD")
+    cal = Calendar(group, date, date)
+    message = _join_cal(cal=cal)
+    return message
+
+
+def _join_cal(cal):
+    if not len(cal):
+        return "Rien ce jour là"
+    else:
+        return "\n\n".join([str(event) for event in cal])
